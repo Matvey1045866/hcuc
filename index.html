@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Mobile Minecraft 3D Online</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<style>
+body{margin:0;overflow:hidden;background:black;font-family:sans-serif}
+#ui,#inv,#top{position:fixed;display:flex;gap:6px;z-index:10}
+#ui{bottom:10px;left:50%;transform:translateX(-50%)}
+#inv{top:10px;left:50%;transform:translateX(-50%)}
+#top{top:10px;left:10px}
+.btn,.slot{
+  padding:10px;
+  background:rgba(0,0,0,.6);
+  color:white;
+  border-radius:8px;
+  font-size:14px;
+  border:2px solid white;
+}
+.slot{width:40px;height:40px}
+.active{border-color:yellow}
+</style>
+</head>
+<body>
+
+<div id="top">
+  <div class="btn" id="save">💾</div>
+  <div class="btn" id="load">📂</div>
+  <div class="btn" id="dev">DEV</div>
+</div>
+
+<div id="inv"></div>
+
+<div id="ui">
+  <div class="btn" id="jump">⬆</div>
+  <div class="btn" id="build">⛏</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.158/build/three.min.js"></script>
+
+<script>
+/* ---------- ONLINE ---------- */
+// 🔁 ВСТАВЬ СВОЙ СЕРВЕР
+const WS_URL = "ws://YOUR_IP:8080";
+let ws;
+try{
+  ws = new WebSocket(WS_URL);
+}catch(e){console.log("Offline");}
+
+/* ---------- THREE ---------- */
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x87CEEB);
+
+const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.1,1000);
+camera.position.set(0,2,5);
+
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.AmbientLight(0xffffff,.6));
+const sun=new THREE.DirectionalLight(0xffffff,.6);
+sun.position.set(10,20,10);
+scene.add(sun);
+
+/* ---------- TEXTURES ---------- */
+const loader=new THREE.TextureLoader();
+const tex={
+ grass:loader.load("https://i.imgur.com/8IhKxXc.png"),
+ dirt:loader.load("https://i.imgur.com/1Q9Z1Zm.png"),
+ stone:loader.load("https://i.imgur.com/Zc5Zk1F.png")
+};
+const mat=t=>new THREE.MeshStandardMaterial({map:tex[t]});
+
+/* ---------- WORLD ---------- */
+const blocks={};
+
+function addBlock(x,y,z,type,remote=false){
+ const key=`${x},${y},${z}`;
+ if(blocks[key])return;
+ const m=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),mat(type));
+ m.position.set(x,y,z);
+ m.userData={x,y,z,type};
+ scene.add(m);
+ blocks[key]=m;
+
+ if(ws && ws.readyState===1 && !remote){
+   ws.send(JSON.stringify({type:"block",block:m.userData}));
+ }
+}
+
+function genWorld(){
+ for(let x=-8;x<8;x++)
+ for(let z=-8;z<8;z++){
+   addBlock(x,0,z,"grass",true);
+   if(Math.random()>.7)addBlock(x,-1,z,"dirt",true);
+ }
+}
+
+/* ---------- SAVE / LOAD ---------- */
+function saveWorld(){
+ localStorage.setItem("world",JSON.stringify(
+   Object.values(blocks).map(b=>b.userData)
+ ));
+ alert("Saved");
+}
+function loadWorld(){
+ const d=JSON.parse(localStorage.getItem("world"));
+ if(!d)return;
+ Object.values(blocks).forEach(b=>scene.remove(b));
+ for(const k in blocks)delete blocks[k];
+ d.forEach(b=>addBlock(b.x,b.y,b.z,b.type,true));
+}
+
+/* ---------- INVENTORY ---------- */
+const inv=["grass","dirt","stone"];
+let cur=0;
+const invDiv=document.getElementById("inv");
+inv.forEach((_,i)=>{
+ const s=document.createElement("div");
+ s.className="slot"+(i==0?" active":"");
+ s.onclick=()=>sel(i);
+ invDiv.appendChild(s);
+});
+function sel(i){
+ cur=i;
+ document.querySelectorAll(".slot").forEach(s=>s.classList.remove("active"));
+ document.querySelectorAll(".slot")[i].classList.add("active");
+}
+
+/* ---------- PLAYER ---------- */
+let velY=0,grounded=false,fly=false;
+const grav=.015,speed=.08;
+let forward=false;
+
+addEventListener("touchstart",()=>forward=true);
+addEventListener("touchend",()=>forward=false);
+
+jump.onclick=()=>{
+ if(grounded||fly){velY=.25;grounded=false;}
+};
+
+build.onclick=()=>{
+ const d=new THREE.Vector3();
+ camera.getWorldDirection(d);
+ const p=camera.position.clone().add(d.multiplyScalar(2));
+ addBlock(Math.round(p.x),Math.round(p.y),Math.round(p.z),inv[cur]);
+};
+
+dev.onclick=()=>{fly=!fly;alert("DEV "+(fly?"ON":"OFF"))};
+save.onclick=saveWorld;
+load.onclick=loadWorld;
+
+/* ---------- ONLINE RECEIVE ---------- */
+if(ws){
+ ws.onmessage=e=>{
+  const d=JSON.parse(e.data);
+  if(d.type==="init")d.world.forEach(b=>addBlock(b.x,b.y,b.z,b.type,true));
+  if(d.type==="block"){
+    const b=d.block;
+    addBlock(b.x,b.y,b.z,b.type,true);
+  }
+ };
+}
+
+/* ---------- LOOP ---------- */
+function loop(){
+ requestAnimationFrame(loop);
+ if(forward){
+  camera.position.x-=Math.sin(camera.rotation.y)*speed;
+  camera.position.z-=Math.cos(camera.rotation.y)*speed;
+ }
+ if(!fly){
+  velY-=grav;
+  camera.position.y+=velY;
+  if(camera.position.y<2){
+    camera.position.y=2;
+    velY=0;grounded=true;
+  }
+ }
+ renderer.render(scene,camera);
+}
+genWorld();
+loop();
+
+addEventListener("resize",()=>{
+ camera.aspect=innerWidth/innerHeight;
+ camera.updateProjectionMatrix();
+ renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>
