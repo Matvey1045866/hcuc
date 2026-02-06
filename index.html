@@ -2,24 +2,21 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Mobile Minecraft 3D ULTIMATE</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>MC Web iOS</title>
 
-<link rel="manifest" href='data:application/json,{
-"name":"MC Web",
-"short_name":"MC",
-"start_url":".",
-"display":"standalone",
-"background_color":"#000000",
-"theme_color":"#000000"
-}'>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
 <style>
 body{margin:0;overflow:hidden;background:#000;font-family:sans-serif}
 .btn,.slot{
  background:rgba(0,0,0,.6);
- color:#fff;border:2px solid #fff;
- border-radius:8px;padding:10px;font-size:14px
+ color:#fff;
+ border:2px solid #fff;
+ border-radius:8px;
+ padding:10px;
+ font-size:14px;
 }
 #top,#inv,#ui,#hp{position:fixed;display:flex;gap:6px;z-index:10}
 #top{top:10px;left:10px}
@@ -28,7 +25,8 @@ body{margin:0;overflow:hidden;background:#000;font-family:sans-serif}
 #hp{bottom:10px;left:10px}
 .slot{width:40px;height:40px}
 .active{border-color:yellow}
-#joy{position:fixed;bottom:20px;right:20px;width:120px;height:120px;border-radius:50%;border:2px solid #fff}
+#look{position:fixed;right:0;top:0;width:50%;height:100%}
+#joy{position:fixed;left:20px;bottom:20px;width:120px;height:120px;border:2px solid #fff;border-radius:50%}
 #stick{position:absolute;left:40px;top:40px;width:40px;height:40px;border-radius:50%;background:#fff}
 </style>
 </head>
@@ -45,103 +43,109 @@ body{margin:0;overflow:hidden;background:#000;font-family:sans-serif}
 <div id="ui">
  <div class="btn" id="jump">⬆</div>
  <div class="btn" id="build">⛏</div>
- <div class="btn" id="break">❌</div>
+ <div class="btn" id="destroy">❌</div>
 </div>
 
 <div id="hp" class="btn">❤ 100</div>
 
 <div id="joy"><div id="stick"></div></div>
+<div id="look"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.158/build/three.min.js"></script>
 <script>
-/* CONFIG */
-const WS_URL="ws://YOUR_IP:8080";
-const CHUNK=8;
-
-/* NETWORK */
-let ws=null,online=false;
-try{
- ws=new WebSocket(WS_URL);
- ws.onopen=()=>online=true;
-}catch(e){}
-
-/* THREE */
+/* ========== THREE (iOS SAFE) ========== */
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x87CEEB);
-const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,1000);
+
+const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.1,500);
 camera.position.set(0,2,5);
-const renderer=new THREE.WebGLRenderer({antialias:true});
+
+const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:"low-power"});
 renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(2,devicePixelRatio));
 document.body.appendChild(renderer.domElement);
-scene.add(new THREE.AmbientLight(0xffffff,.6));
-const sun=new THREE.DirectionalLight(0xffffff,.6);
-sun.position.set(10,20,10);
+
+scene.add(new THREE.AmbientLight(0xffffff,0.7));
+const sun=new THREE.DirectionalLight(0xffffff,0.6);
+sun.position.set(5,10,5);
 scene.add(sun);
 
-/* TEXTURES */
-const l=new THREE.TextureLoader();
-const tex={
- grass:l.load("https://i.imgur.com/8IhKxXc.png"),
- dirt:l.load("https://i.imgur.com/1Q9Z1Zm.png"),
- stone:l.load("https://i.imgur.com/Zc5Zk1F.png")
+/* ========== TEXTURES ========== */
+const loader=new THREE.TextureLoader();
+const textures={
+ grass:loader.load("https://i.imgur.com/8IhKxXc.png"),
+ dirt:loader.load("https://i.imgur.com/1Q9Z1Zm.png"),
+ stone:loader.load("https://i.imgur.com/Zc5Zk1F.png")
 };
-const mat=t=>new THREE.MeshStandardMaterial({map:tex[t]});
+const material=t=>new THREE.MeshStandardMaterial({map:textures[t]});
 
-/* WORLD */
+/* ========== WORLD ========== */
 const blocks={};
 const key=(x,y,z)=>`${x},${y},${z}`;
 
-function addBlock(x,y,z,t,remote=false){
- if(Math.abs(x)>200||Math.abs(z)>200)return;
- const k=key(x,y,z); if(blocks[k])return;
- const m=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),mat(t));
+function addBlock(x,y,z,type){
+ const k=key(x,y,z);
+ if(blocks[k])return;
+ const m=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),material(type));
  m.position.set(x,y,z);
- m.userData={x,y,z,t};
- scene.add(m); blocks[k]=m;
- if(online&&!remote)ws.send(JSON.stringify({b:m.userData}));
-}
-function remBlock(x,y,z,remote=false){
- const k=key(x,y,z); if(!blocks[k])return;
- scene.remove(blocks[k]); delete blocks[k];
- if(online&&!remote)ws.send(JSON.stringify({r:{x,y,z}}));
+ m.userData={x,y,z,type};
+ scene.add(m);
+ blocks[k]=m;
 }
 
-/* CHUNKS */
-function gen(cx,cz){
- for(let x=0;x<CHUNK;x++)
- for(let z=0;z<CHUNK;z++){
-  const wx=cx*CHUNK+x, wz=cz*CHUNK+z;
-  addBlock(wx,0,wz,"grass",true);
-  if(Math.random()>.6)addBlock(wx,-1,wz,"dirt",true);
- }
+function removeBlock(x,y,z){
+ const k=key(x,y,z);
+ if(!blocks[k])return;
+ scene.remove(blocks[k]);
+ delete blocks[k];
 }
 
-/* SAVE */
-save.onclick=()=>localStorage.setItem("world",JSON.stringify(Object.values(blocks).map(b=>b.userData)));
+/* ========== GENERATE WORLD ========== */
+for(let x=-6;x<=6;x++)
+for(let z=-6;z<=6;z++){
+ addBlock(x,0,z,"grass");
+ if(Math.random()>0.7)addBlock(x,-1,z,"dirt");
+}
+
+/* ========== SAVE / LOAD ========== */
+save.onclick=()=>{
+ localStorage.setItem("world",JSON.stringify(Object.values(blocks).map(b=>b.userData)));
+};
+
 load.onclick=()=>{
  const d=JSON.parse(localStorage.getItem("world"));
  if(!d)return;
  Object.values(blocks).forEach(b=>scene.remove(b));
  for(const k in blocks)delete blocks[k];
- d.forEach(b=>addBlock(b.x,b.y,b.z,b.t,true));
+ d.forEach(b=>addBlock(b.x,b.y,b.z,b.type));
 };
 
-/* INVENTORY */
-const inv=["grass","dirt","stone"];
-let cur=0;
-inv.forEach((_,i)=>{
+/* ========== INVENTORY ========== */
+const inventory=["grass","dirt","stone"];
+let current=0;
+const invDiv=document.getElementById("inv");
+
+inventory.forEach((_,i)=>{
  const s=document.createElement("div");
- s.className="slot"+(i==0?" active":"");
- s.onclick=()=>{cur=i;document.querySelectorAll(".slot").forEach(e=>e.classList.remove("active"));s.classList.add("active")};
+ s.className="slot"+(i===0?" active":"");
+ s.onclick=()=>{
+  current=i;
+  document.querySelectorAll(".slot").forEach(e=>e.classList.remove("active"));
+  s.classList.add("active");
+ };
  invDiv.appendChild(s);
 });
 
-/* PLAYER */
-let vy=0,ground=false,fly=false,god=false,hp=100;
-const grav=.015,spd=.08;
+/* ========== PLAYER ========== */
+let vy=0,grounded=false,fly=false;
+let hp=100;
+const gravity=0.015,speed=0.08;
 let mx=0,mz=0;
 
-/* JOYSTICK */
+/* ========== JOYSTICK MOVE ========== */
+const joy=document.getElementById("joy");
+const stick=document.getElementById("stick");
+
 joy.ontouchmove=e=>{
  const r=joy.getBoundingClientRect();
  mx=(e.touches[0].clientX-r.left-60)/40;
@@ -153,64 +157,65 @@ joy.ontouchmove=e=>{
 };
 joy.ontouchend=()=>{mx=mz=0;stick.style.left=stick.style.top="40px"};
 
-/* CONTROLS */
-jump.onclick=()=>{if(ground||fly){vy=.25;ground=false}};
+/* ========== TOUCH LOOK (iOS FIX) ========== */
+let lx=0,ly=0;
+const look=document.getElementById("look");
+
+look.ontouchstart=e=>{
+ lx=e.touches[0].clientX;
+ ly=e.touches[0].clientY;
+};
+
+look.ontouchmove=e=>{
+ const dx=(e.touches[0].clientX-lx)*0.005;
+ const dy=(e.touches[0].clientY-ly)*0.005;
+ camera.rotation.y-=dx;
+ camera.rotation.x=Math.max(-1.5,Math.min(1.5,camera.rotation.x-dy));
+ lx=e.touches[0].clientX;
+ ly=e.touches[0].clientY;
+};
+
+/* ========== ACTIONS ========== */
+jump.onclick=()=>{
+ if(grounded||fly){vy=0.25;grounded=false;}
+};
+
 build.onclick=()=>{
- const d=new THREE.Vector3();camera.getWorldDirection(d);
+ const d=new THREE.Vector3();
+ camera.getWorldDirection(d);
  const p=camera.position.clone().add(d.multiplyScalar(2));
- addBlock(Math.round(p.x),Math.round(p.y),Math.round(p.z),inv[cur]);
+ addBlock(Math.round(p.x),Math.round(p.y),Math.round(p.z),inventory[current]);
 };
-break.onclick=()=>{
- const d=new THREE.Vector3();camera.getWorldDirection(d);
+
+destroy.onclick=()=>{
+ const d=new THREE.Vector3();
+ camera.getWorldDirection(d);
  const p=camera.position.clone().add(d.multiplyScalar(2));
- remBlock(Math.round(p.x),Math.round(p.y),Math.round(p.z));
-};
-dev.onclick=()=>{fly=!fly;god=!god};
-
-/* MOBS */
-const mobs=[];
-function spawnMob(x,z){
- const m=new THREE.Mesh(new THREE.BoxGeometry(1,2,1),
-  new THREE.MeshStandardMaterial({color:0xff0000}));
- m.position.set(x,1,z);
- m.hp=20;
- scene.add(m); mobs.push(m);
-}
-for(let i=0;i<5;i++)spawnMob(Math.random()*10-5,Math.random()*10-5);
-
-/* ONLINE */
-if(ws)ws.onmessage=e=>{
- const d=JSON.parse(e.data);
- if(d.b)addBlock(d.b.x,d.b.y,d.b.z,d.b.t,true);
- if(d.r)remBlock(d.r.x,d.r.y,d.r.z,true);
+ removeBlock(Math.round(p.x),Math.round(p.y),Math.round(p.z));
 };
 
-/* LOOP */
-let cx=0,cz=0;
+dev.onclick=()=>{fly=!fly};
+
+/* ========== LOOP ========== */
 function loop(){
  requestAnimationFrame(loop);
 
- camera.position.x+=(-Math.sin(camera.rotation.y)*mz+Math.cos(camera.rotation.y)*mx)*spd;
- camera.position.z+=(-Math.cos(camera.rotation.y)*mz-Math.sin(camera.rotation.y)*mx)*spd;
+ camera.position.x+=(-Math.sin(camera.rotation.y)*mz+Math.cos(camera.rotation.y)*mx)*speed;
+ camera.position.z+=(-Math.cos(camera.rotation.y)*mz-Math.sin(camera.rotation.y)*mx)*speed;
 
  if(!fly){
-  vy-=grav; camera.position.y+=vy;
-  if(camera.position.y<2){camera.position.y=2;vy=0;ground=true;}
+  vy-=gravity;
+  camera.position.y+=vy;
+  if(camera.position.y<2){
+   camera.position.y=2;
+   vy=0;
+   grounded=true;
+  }
  }
-
- mobs.forEach(m=>{
-  const d=camera.position.clone().sub(m.position);
-  if(d.length()<10)m.position.add(d.normalize().multiplyScalar(.01));
-  if(d.length()<1&&!god){hp--;document.getElementById("hp").innerText="❤ "+hp;}
- });
-
- const ncx=Math.floor(camera.position.x/CHUNK);
- const ncz=Math.floor(camera.position.z/CHUNK);
- if(ncx!=cx||ncz!=cz){cx=ncx;cz=ncz;gen(cx,cz)}
 
  renderer.render(scene,camera);
 }
-gen(0,0); loop();
+loop();
 
 addEventListener("resize",()=>{
  camera.aspect=innerWidth/innerHeight;
