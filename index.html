@@ -1,1 +1,37 @@
-webpage in beta!
+local part = script.Parent
+local remote = part:WaitForChild("DragRemote")
+
+local draggingPlayer = nil
+
+remote.OnServerEvent:Connect(function(player, action, inputPosition)
+	if action == "Start" then
+		draggingPlayer = player
+		part:SetNetworkOwner(nil) -- сервер контролирует объект
+
+	elseif action == "Move" then
+		if player ~= draggingPlayer then return end
+		if not inputPosition then return end
+
+		-- Пример: движение по XZ
+		local camera = workspace.CurrentCamera
+		if not camera then return end
+
+		local ray = workspace:Raycast(
+			camera.CFrame.Position,
+			camera:ScreenPointToRay(inputPosition.X, inputPosition.Y).Direction * 500
+		)
+
+		if ray then
+			part.Position = Vector3.new(
+				ray.Position.X,
+				part.Position.Y,
+				ray.Position.Z
+			)
+		end
+
+	elseif action == "End" then
+		if player == draggingPlayer then
+			draggingPlayer = nil
+		end
+	end
+end)
