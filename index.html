@@ -4,23 +4,9 @@ from tkhtmlview import HTMLLabel
 root = tk.Tk()
 root.title("HTML в Tkinter")
 root.geometry("800x600")
-
+mainvarfromweb = req.get(input("Введите домен веб-страницы с кодом: "))
 # HTML-код, который будет отображён
-html_content = """
-<html>
-  <head>
-    <style>
-      body { font-family: Arial, sans-serif; }
-      h1 { color: blue; }
-    </style>
-  </head>
-  <body>
-    <h1>Привет из HTML!</h1>
-    <p>Это текст с <b>жирным</b> и <i>курсивом</i>.</p>
-    <img src="https://example.com/image.jpg" alt="Пример изображения">
-  </body>
-</html>
-"""
+html_content = mainvarfromweb.text
 
 # Создаём виджет HTMLLabel и передаём HTML
 html_label = HTMLLabel(
