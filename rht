@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>HTML Redirect Tool</title>
+
+<style>
+body{
+    font-family: Arial, sans-serif;
+    margin:40px;
+}
+
+textarea{
+    width:100%;
+    height:200px;
+    font-family:monospace;
+    font-size:14px;
+}
+
+button{
+    margin-top:10px;
+    margin-right:10px;
+    padding:10px 15px;
+    font-size:16px;
+}
+</style>
+
+</head>
+<body>
+
+<h2>Введите HTML</h2>
+
+<textarea id="input1" placeholder="Введите HTML код здесь"></textarea>
+
+<br>
+
+<button onclick="redirectPage()">Перенаправить на ссылку</button>
+<button onclick="openNewTab()">Открыть в новой вкладке</button>
+
+<script>
+
+function createURL(){
+    var text = document.getElementById("input1").value;
+    var created_url = "data:text/html;charset=utf-8," + encodeURIComponent(text);
+    return created_url;
+}
+
+function redirectPage(){
+    window.location.href = createURL();
+}
+
+function openNewTab(){
+    window.open(createURL(), "_blank");
+}
+
+</script>
+
+</body>
+</html>
