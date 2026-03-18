@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Для любимой</title>
+    <link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css" />
+    <script defer src="https://pyscript.net/latest/pyscript.js"></script>
+</head>
+<body>
+    <h1>Момочка, любимая! ❤️</h1>
+    
+    <input placeholder="Напиши любой текст" type="text">
+    
+    <div id="output"></div>
+    
+    <py-script>
+        import time
+        from js import document
+        
+        # Первое сообщение
+        output = document.getElementById("output")
+        output.innerText = "Подожди 5 сек...\n"
+        
+        # Ждем 5 секунд
+        time.sleep(5)
+        
+        # Второе сообщение
+        output.innerText += "Люблю! ❤️"
+    </py-script>
+</body>
+</html>
