@@ -1,6 +1,6 @@
 import time
 
-# Теперь используем Element для HTML-вывода
+# Теперь используем document для HTML-вывода
 from js import document
 
 msg = document.getElementById("msg")
