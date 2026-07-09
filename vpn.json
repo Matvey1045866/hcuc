@@ -1,0 +1,77 @@
+{
+  "log" : {
+    "loglevel" : "info"
+  },
+  "inbounds" : [
+    {
+      "settings" : {
+        "udp" : true,
+        "auth" : "noauth"
+      },
+      "tag" : "socks",
+      "sniffing" : {
+        "enabled" : true,
+        "routeOnly" : false,
+        "destOverride" : [
+          "quic",
+          "tls",
+          "http"
+        ]
+      },
+      "protocol" : "socks",
+      "listen" : "[::1]",
+      "port" : 1080
+    }
+  ],
+  "policy" : {
+    "system" : {
+      "statsOutboundDownlink" : true,
+      "statsInboundUplink" : true,
+      "statsInboundDownlink" : true,
+      "statsOutboundUplink" : true
+    }
+  },
+  "outbounds" : [
+    {
+      "settings" : {
+        "encryption" : "none",
+        "id" : "5379ef7f-9cf4-4a3e-96f1-edca73cf616e",
+        "port" : 443,
+        "address" : "ws1.confstage.com"
+      },
+      "tag" : "proxy",
+      "protocol" : "vless",
+      "streamSettings" : {
+        "wsSettings" : {
+          "headers" : {
+            "Host" : "ws1.confstage.com"
+          },
+          "path" : "\/"
+        },
+        "network" : "ws",
+        "security" : "none"
+      }
+    },
+    {
+      "settings" : {
+        "response" : {
+          "type" : "none"
+        }
+      },
+      "tag" : "block",
+      "protocol" : "blackhole"
+    },
+    {
+      "settings" : {
+
+      },
+      "tag" : "direct",
+      "protocol" : "freedom"
+    }
+  ],
+  "stats" : {
+
+  },
+  "remarks" : "🇳🇱 [NL] NEODON VPN",
+  "id" : "97071BDF-8229-4BFE-AE30-550C02538C41"
+}
